@@ -1,6 +1,10 @@
 # commutify
 A tool that creates a Spotify playlist exactly the length of your commute
 
+# Setup
+
+Create `config.json` and include your spotify `clientID` and `clientSecret`
+
 # Todos
 
 ## Spotify API
