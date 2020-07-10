@@ -1,6 +1,9 @@
 # commutify
 A tool that creates a Spotify playlist exactly the length of your commute
 
+![Go](https://github.com/khalilhaji/commutify/workflows/Go/badge.svg)
+
+
 # Setup
 
 Create `config.json` and include your spotify `clientID` and `clientSecret`
