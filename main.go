@@ -11,13 +11,17 @@ func main() {
 
 	client, err := spotify.NewSpotifyClient()
 
+	if err != nil || client == nil {
+		log.Fatal(err)
+	}
+	fmt.Println("Authorization successful!")
+
+	fmt.Println("Grabbing user songs")
+
+	tracks, err := client.UserTracks()
 	if err != nil {
 		log.Fatal(err)
 	}
 
-	resp, err := client.GetProfile()
-	if resp.StatusCode == 200 {
-		fmt.Println("Authorization successful!")
-	}
-
+	fmt.Println(len(tracks), "tracks acquired")
 }
