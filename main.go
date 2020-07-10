@@ -23,5 +23,7 @@ func main() {
 		log.Fatal(err)
 	}
 
-	fmt.Println(len(tracks), "tracks acquired")
+	if err := client.CreatePlaylist("test1", tracks[:10]); err != nil {
+		log.Fatal(err)
+	}
 }

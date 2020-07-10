@@ -2,8 +2,10 @@
 package spotify
 
 import (
+	"bytes"
 	"context"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"io/ioutil"
 	"log"
@@ -46,7 +48,7 @@ func NewSpotifyClient() (*Client, error) {
 		ClientSecret: conf.ClientSecret,
 		Endpoint:     spotify.Endpoint,
 		RedirectURL:  "http://localhost:8080",
-		Scopes:       []string{"playlist-modify-private", "playlist-read-private", "user-library-read"},
+		Scopes:       []string{"playlist-modify-public", "playlist-modify-private", "playlist-read-private", "user-library-read"},
 	}
 
 	codeChannel := make(chan string)
@@ -68,12 +70,12 @@ func NewSpotifyClient() (*Client, error) {
 
 	client := config.Client(ctx, tok)
 	wg.Wait()
-	resp, err := client.Get("https://api.spotify.com/v1/me")
+	profileResp, err := client.Get("https://api.spotify.com/v1/me")
 	if err != nil {
 		log.Fatal(err)
 	}
-	defer resp.Body.Close()
-	body, err := ioutil.ReadAll(resp.Body)
+	defer profileResp.Body.Close()
+	body, err := ioutil.ReadAll(profileResp.Body)
 	if err != nil {
 		log.Fatal(err)
 	}
@@ -130,13 +132,13 @@ type Song struct {
 
 // UserTracks gets a list of all the songs in the spotify user's library.
 func (c *Client) UserTracks() ([]Song, error) {
-	resp, err := c.apiClient.Get("https://api.spotify.com/v1/me/tracks")
+	trackResp, err := c.apiClient.Get("https://api.spotify.com/v1/me/tracks")
 
 	if err != nil {
 		return nil, err
 	}
 
-	defer resp.Body.Close()
+	defer trackResp.Body.Close()
 
 	type apiResponse struct {
 		Songs []struct {
@@ -145,7 +147,7 @@ func (c *Client) UserTracks() ([]Song, error) {
 		Next string
 	}
 
-	body, err := ioutil.ReadAll(resp.Body)
+	body, err := ioutil.ReadAll(trackResp.Body)
 	if err != nil {
 		return nil, err
 	}
@@ -159,15 +161,15 @@ func (c *Client) UserTracks() ([]Song, error) {
 	}
 
 	for parsedResp.Next != "" {
-		resp, err = c.apiClient.Get(parsedResp.Next)
+		trackResp, err = c.apiClient.Get(parsedResp.Next)
 
 		if err != nil {
 			return nil, err
 		}
-		defer resp.Body.Close()
+		defer trackResp.Body.Close()
 		parsedResp = apiResponse{}
 
-		body, err = ioutil.ReadAll(resp.Body)
+		body, err = ioutil.ReadAll(trackResp.Body)
 
 		if err != nil {
 			return nil, err
@@ -181,4 +183,58 @@ func (c *Client) UserTracks() ([]Song, error) {
 	}
 
 	return res, nil
+}
+
+func (c *Client) CreatePlaylist(name string, songs []Song) error {
+	creationJSON, err := json.Marshal(map[string]interface{}{
+		"name":        name,
+		"description": "Created by commutify"})
+	if err != nil {
+		return err
+	}
+	createResp, err := c.apiClient.Post(fmt.Sprintf("https://api.spotify.com/v1/users/%s/playlists", c.userID), "application/json", bytes.NewReader(creationJSON))
+
+	if err != nil || (createResp.StatusCode != http.StatusOK && createResp.StatusCode != http.StatusCreated) {
+		return errors.New(fmt.Sprint("Error creating playlist, http status code:", createResp.StatusCode))
+	}
+
+	defer createResp.Body.Close()
+
+	body, err := ioutil.ReadAll(createResp.Body)
+	if err != nil {
+		return err
+	}
+
+	var plistID struct {
+		ID string
+	}
+
+	if err := json.Unmarshal(body, &plistID); err != nil {
+		return err
+	}
+
+	songIds := make([]string, len(songs))
+	for i, v := range songs {
+		songIds[i] = fmt.Sprintf("spotify:track:%s", v.ID)
+	}
+
+	songsJSON, err := json.Marshal(map[string]interface{}{
+		"uris": songIds,
+	})
+
+	if err != nil {
+		return err
+	}
+
+	addResp, err := c.apiClient.Post(fmt.Sprintf("https://api.spotify.com/v1/playlists/%s/tracks", plistID.ID), "application/json", bytes.NewReader(songsJSON))
+
+	if err != nil || addResp.StatusCode != http.StatusCreated {
+		return errors.New(fmt.Sprint("Error adding songs to playlist, http status code:", addResp.StatusCode))
+	}
+
+	fmt.Println("Playlist created successfully")
+
+	defer addResp.Body.Close()
+
+	return nil
 }
