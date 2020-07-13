@@ -18,18 +18,19 @@ import (
 	"golang.org/x/oauth2/spotify"
 )
 
+// Stores client id and client secret for spotify API.
 type clientConfig struct {
 	ClientID, ClientSecret string
 }
 
 // Client provides functionality for playlist operations offered by the spotify API.
-type Client struct {
+type client struct {
 	apiClient *http.Client
 	userID    string
 }
 
 // NewSpotifyClient creates a new spotify client by receiving an authorization token from the spotify api.
-func NewSpotifyClient() (*Client, error) {
+func NewSpotifyClient() (*client, error) {
 
 	rawConf, err := ioutil.ReadFile("config.json")
 	if err != nil {
@@ -48,7 +49,7 @@ func NewSpotifyClient() (*Client, error) {
 		ClientSecret: conf.ClientSecret,
 		Endpoint:     spotify.Endpoint,
 		RedirectURL:  "http://localhost:8080",
-		Scopes:       []string{"playlist-modify-public", "playlist-modify-private", "playlist-read-private", "user-library-read"},
+		Scopes:       []string{"playlist-modify-public", "user-library-read"},
 	}
 
 	codeChannel := make(chan string)
@@ -59,8 +60,6 @@ func NewSpotifyClient() (*Client, error) {
 	url := config.AuthCodeURL("state")
 	exec.Command("open", url).Start()
 
-	fmt.Println("Authorizing")
-
 	code := <-codeChannel
 
 	tok, err := config.Exchange(ctx, code)
@@ -68,27 +67,28 @@ func NewSpotifyClient() (*Client, error) {
 		return nil, err
 	}
 
-	client := config.Client(ctx, tok)
+	cli := config.Client(ctx, tok)
 	wg.Wait()
-	profileResp, err := client.Get("https://api.spotify.com/v1/me")
+	profileResp, err := cli.Get("https://api.spotify.com/v1/me")
 	if err != nil {
 		log.Fatal(err)
 	}
 	defer profileResp.Body.Close()
 	body, err := ioutil.ReadAll(profileResp.Body)
 	if err != nil {
-		log.Fatal(err)
+		return nil, err
 	}
 	var parsedBody map[string]interface{}
 	json.Unmarshal(body, &parsedBody)
 	uid, ok := parsedBody["id"].(string)
 	if !ok {
-		log.Fatal("could not retrieve user id")
+		return nil, errors.New("could not retrieve user id")
 	}
 
-	return &Client{client, uid}, nil
+	return &client{cli, uid}, nil
 }
 
+// Listens for callback from spotify API and sends api token to channel.
 func receiveToken(ctx context.Context, ch chan string, wg *sync.WaitGroup) {
 	s := http.Server{Addr: ":8080"}
 
@@ -117,21 +117,19 @@ func receiveToken(ctx context.Context, ch chan string, wg *sync.WaitGroup) {
 		}
 	})
 
-	err := s.ListenAndServe()
-	if err != nil {
-		fmt.Println(err)
-	}
+	s.ListenAndServe()
 	wg.Done()
 }
 
 // Song represents a single track with an id and a length in milliseconds
 type Song struct {
-	Duration int    `json:"duration_ms"`
-	ID       string `json:"id"`
+	Duration   int    `json:"duration_ms"`
+	ID         string `json:"id"`
+	Popularity int    `json:"popularity"`
 }
 
 // UserTracks gets a list of all the songs in the spotify user's library.
-func (c *Client) UserTracks() ([]Song, error) {
+func (c *client) UserTracks() ([]Song, error) {
 	trackResp, err := c.apiClient.Get("https://api.spotify.com/v1/me/tracks")
 
 	if err != nil {
@@ -185,7 +183,8 @@ func (c *Client) UserTracks() ([]Song, error) {
 	return res, nil
 }
 
-func (c *Client) CreatePlaylist(name string, songs []Song) error {
+// CreatePlaylist creates a public playlist for the authenticated user with the given name and tracks.
+func (c *client) CreatePlaylist(name string, songs []Song) error {
 	creationJSON, err := json.Marshal(map[string]interface{}{
 		"name":        name,
 		"description": "Created by commutify"})
@@ -231,8 +230,6 @@ func (c *Client) CreatePlaylist(name string, songs []Song) error {
 	if err != nil || addResp.StatusCode != http.StatusCreated {
 		return errors.New(fmt.Sprint("Error adding songs to playlist, http status code:", addResp.StatusCode))
 	}
-
-	fmt.Println("Playlist created successfully")
 
 	defer addResp.Body.Close()
 

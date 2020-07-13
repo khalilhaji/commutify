@@ -6,22 +6,22 @@ A tool that creates a Spotify playlist exactly the length of your commute
 
 # Setup
 
-Create `config.json` and include your spotify `clientID` and `clientSecret`
+Create `config.json` and include your spotify `clientID` and `clientSecret` along with `geocodioToken` and `citymapperToken`
 
 # Todos
 
 ## Spotify API
-* Create spotify app
-* Get time from stdin
-* Authenticate user
-* Grab liked songs from user
-* Create song list for new playlist with length within tolerance
+* [x] Create spotify app
+* [x] Get time from stdin
+* [x] Authenticate user
+* [x] Grab liked songs from user
+* [x] Create song list for new playlist with length within tolerance
 
-## Google Maps API
-* Accept address from stdin
-* Prompt user for route to determine time
-* Feed time into playlist generator
+## ~~Google Maps~~ Citymapper API
+* [x] Accept address from stdin
+* [x] Feed time into playlist generator
 
 ## Future Improvements
-* Account for pausing during boarding/transferring between train and bus
-* Adjust BPM based on morning/evening commute and transportation method/speed
+* [] Account for pausing during boarding/transferring between train and bus
+* [] Prompt user for route to determine time
+* [] Adjust BPM based on morning/evening commute and transportation method/speed
