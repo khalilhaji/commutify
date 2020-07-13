@@ -22,6 +22,6 @@ Create `config.json` and include your spotify `clientID` and `clientSecret` alon
 * [x] Feed time into playlist generator
 
 ## Future Improvements
-* [] Account for pausing during boarding/transferring between train and bus
-* [] Prompt user for route to determine time
-* [] Adjust BPM based on morning/evening commute and transportation method/speed
+* [ ] Account for pausing during boarding/transferring between train and bus
+* [ ] Prompt user for route to determine time
+* [ ] Adjust BPM based on morning/evening commute and transportation method/speed
