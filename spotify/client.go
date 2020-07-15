@@ -55,7 +55,7 @@ func NewSpotifyClient() (*client, error) {
 	codeChannel := make(chan string)
 	var wg sync.WaitGroup
 	wg.Add(1)
-	go receiveToken(ctx, codeChannel, &wg)
+	go receiveToken(ctx, codeChannel)
 
 	url := config.AuthCodeURL("state")
 	exec.Command("open", url).Start()
@@ -89,7 +89,7 @@ func NewSpotifyClient() (*client, error) {
 }
 
 // Listens for callback from spotify API and sends api token to channel.
-func receiveToken(ctx context.Context, ch chan string, wg *sync.WaitGroup) {
+func receiveToken(ctx context.Context, ch chan string) {
 	s := http.Server{Addr: ":8080"}
 
 	http.HandleFunc("/", func(w http.ResponseWriter, r *http.Request) {
@@ -107,18 +107,19 @@ func receiveToken(ctx context.Context, ch chan string, wg *sync.WaitGroup) {
 			return
 		}
 
-		ch <- code[0]
-
 		w.Header().Set("Content-Type", "text/html; charset=utf-8")
 		_, err = w.Write([]byte("<script>window.close();</script>"))
 		w.(http.Flusher).Flush()
 		if err != nil {
 			log.Fatal(err)
 		}
+		defer func() {
+			ch <- code[0]
+		}()
+
 	})
 
 	s.ListenAndServe()
-	wg.Done()
 }
 
 // Song represents a single track with an id and a length in milliseconds
