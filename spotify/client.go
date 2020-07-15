@@ -27,6 +27,7 @@ type clientConfig struct {
 type client struct {
 	apiClient *http.Client
 	userID    string
+	apiURL    string
 }
 
 // NewSpotifyClient creates a new spotify client by receiving an authorization token from the spotify api.
@@ -85,7 +86,7 @@ func NewSpotifyClient() (*client, error) {
 		return nil, errors.New("could not retrieve user id")
 	}
 
-	return &client{cli, uid}, nil
+	return &client{cli, uid, "https://api.spotify.com/v1"}, nil
 }
 
 // Listens for callback from spotify API and sends api token to channel.
@@ -131,10 +132,12 @@ type Song struct {
 
 // UserTracks gets a list of all the songs in the spotify user's library.
 func (c *client) UserTracks() ([]Song, error) {
-	trackResp, err := c.apiClient.Get("https://api.spotify.com/v1/me/tracks")
+	trackResp, err := c.apiClient.Get(c.apiURL + "/me/tracks")
 
 	if err != nil {
 		return nil, err
+	} else if trackResp.StatusCode != http.StatusOK {
+		return nil, errors.New(fmt.Sprint("Server returned status code:", trackResp.StatusCode))
 	}
 
 	defer trackResp.Body.Close()
@@ -192,7 +195,7 @@ func (c *client) CreatePlaylist(name string, songs []Song) error {
 	if err != nil {
 		return err
 	}
-	createResp, err := c.apiClient.Post(fmt.Sprintf("https://api.spotify.com/v1/users/%s/playlists", c.userID), "application/json", bytes.NewReader(creationJSON))
+	createResp, err := c.apiClient.Post(fmt.Sprintf(c.apiURL+"/users/%s/playlists", c.userID), "application/json", bytes.NewReader(creationJSON))
 
 	if err != nil || (createResp.StatusCode != http.StatusOK && createResp.StatusCode != http.StatusCreated) {
 		return errors.New(fmt.Sprint("Error creating playlist, http status code:", createResp.StatusCode))
@@ -226,7 +229,7 @@ func (c *client) CreatePlaylist(name string, songs []Song) error {
 		return err
 	}
 
-	addResp, err := c.apiClient.Post(fmt.Sprintf("https://api.spotify.com/v1/playlists/%s/tracks", plistID.ID), "application/json", bytes.NewReader(songsJSON))
+	addResp, err := c.apiClient.Post(fmt.Sprintf(c.apiURL+"/playlists/%s/tracks", plistID.ID), "application/json", bytes.NewReader(songsJSON))
 
 	if err != nil || addResp.StatusCode != http.StatusCreated {
 		return errors.New(fmt.Sprint("Error adding songs to playlist, http status code:", addResp.StatusCode))
