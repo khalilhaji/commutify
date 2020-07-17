@@ -12,7 +12,6 @@ import (
 	"net/http"
 	"net/url"
 	"os/exec"
-	"sync"
 
 	"golang.org/x/oauth2"
 	"golang.org/x/oauth2/spotify"
@@ -54,8 +53,6 @@ func NewSpotifyClient() (*client, error) {
 	}
 
 	codeChannel := make(chan string)
-	var wg sync.WaitGroup
-	wg.Add(1)
 	go receiveToken(ctx, codeChannel)
 
 	url := config.AuthCodeURL("state")
@@ -69,7 +66,6 @@ func NewSpotifyClient() (*client, error) {
 	}
 
 	cli := config.Client(ctx, tok)
-	wg.Wait()
 	profileResp, err := cli.Get("https://api.spotify.com/v1/me")
 	if err != nil {
 		log.Fatal(err)
